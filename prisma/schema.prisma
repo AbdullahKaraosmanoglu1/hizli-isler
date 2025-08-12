@@ -1,0 +1,32 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Request {
+  id           Int       @id @default(autoincrement())
+  citizen_name String
+  phone        String
+  address      String
+  category     String
+  description  String
+  status       String    @default("Açık")
+  created_at   DateTime  @default(now())
+  assigned_to  String?
+  resolved_at  DateTime?
+  Survey       Survey?
+}
+
+model Survey {
+  id          Int       @id @default(autoincrement())
+  request_id  Int       @unique
+  invited_at  DateTime  @default(now())
+  score       Int?
+  comment     String?
+  answered_at DateTime?
+  Request     Request   @relation(fields: [request_id], references: [id])
+}
