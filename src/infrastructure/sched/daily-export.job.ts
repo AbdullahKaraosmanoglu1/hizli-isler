@@ -19,6 +19,6 @@ export class DailyExportJob {
     // Elle tetikleme için public metod
     async runOnce() {
         const res = await this.bus.execute(new ExportDailyCommand());
-        return res; // { count, path }
+        return res;
     }
 }

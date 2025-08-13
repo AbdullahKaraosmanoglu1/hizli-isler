@@ -4,6 +4,7 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 COPY . .
+# Build app and generate Prisma client during build
 RUN npm run build
 RUN npx prisma generate
 
@@ -12,22 +13,18 @@ FROM node:20
 WORKDIR /app
 ENV NODE_ENV=production
 
-# 1) Prod bağımlılıklar
-COPY package*.json ./
-RUN npm ci --omit=dev
+# Use node_modules from build (includes Prisma CLI and generated client)
+COPY --from=build /app/node_modules ./node_modules
 
-# 2) Prisma dosyalarını kopyala, SONRA generate
-COPY --from=build /app/prisma ./prisma
-RUN npx prisma generate
-
-# 3) Uygulama çıktısı ve scriptler
+# App dist & scripts
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/prisma ./prisma
 COPY docker ./docker
 
-# (Windows satır sonu önlemi)
+# fix CRLF if any
 RUN sed -i 's/\r$//' ./docker/entrypoint.sh
 
-# 4) Çıktı klasörü
+# Output dir
 RUN mkdir -p /app/out/sftp
 
 EXPOSE 5000

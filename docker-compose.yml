@@ -5,31 +5,28 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: Postgres123!
-      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hizliisler
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres -d postgres" ]
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d hizliisler" ]
       interval: 5s
-      timeout: 3s
-      retries: 10
+      timeout: 5s
+      retries: 20
 
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: .
     container_name: hizliisler-api
     restart: unless-stopped
-    env_file:
-      - .env.docker # DATABASE_URL burada ...@db:5432/... olmalı
+    env_file: .env.docker
+    ports:
+      - "5000:5000"
     depends_on:
       postgres:
         condition: service_healthy
-    ports:
-      - "5000:5000"
     volumes:
       - ./out/sftp:/app/out/sftp
     command: [ "/bin/sh", "./docker/entrypoint.sh" ]
