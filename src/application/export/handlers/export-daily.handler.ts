@@ -17,20 +17,13 @@ export class ExportDailyHandler implements ICommandHandler<ExportDailyCommand> {
             select: { request_id: true, score: true, comment: true, answered_at: true },
             orderBy: { answered_at: 'asc' },
         });
-        console.log(rows);
 
-        const cleaned = rows.map((r) => ({
-            request_id: r.request_id,
-            score: r.score ?? null,
-            comment: r.comment ?? '',
-            answered_at: r.answered_at ?? null,
-        }));
-
+        // PASSTHROUGH — normalize yok
         const day = format(start, 'yyyy-MM-dd');
         const stamp = format(new Date(), 'HHmmss');
         const filename = `${day}_${stamp}_survey_report.csv`;
 
-        const path = await this.csv.writeDaily(filename, cleaned);
+        const path = await this.csv.writeDaily(filename, rows);
         return { path, count: rows.length };
     }
 }

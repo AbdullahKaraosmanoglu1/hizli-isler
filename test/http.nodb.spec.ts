@@ -1,23 +1,26 @@
+// test/http.nodb.spec.ts
 import { Test } from '@nestjs/testing';
 import { INestApplication, CanActivate, ExecutionContext } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { CommandBus } from '@nestjs/cqrs';
 import { AnyKeyGuard, ReportKeyGuard } from '../src/infrastructure/auth/api-key.guards';
+import { CsvWriterService } from '../src/infrastructure/files/csv-writer.service';
 
 class AllowGuard implements CanActivate {
     canActivate(_ctx: ExecutionContext) { return true; }
 }
 
-describe('HTTP (no DB)', () => {
-    let app: INestApplication;
+const createPrismaMock = () =>
+({
+    request: { create: jest.fn(), findMany: jest.fn() },
+    survey: { create: jest.fn(), findMany: jest.fn() },
+} as unknown as PrismaService);
 
-    const prismaMock = {
-        request: { create: jest.fn(), findMany: jest.fn() },
-        survey: { create: jest.fn(), findMany: jest.fn() },
-    } as unknown as PrismaService;
+describe('HTTP (no DB) — bus mocked', () => {
+    let app: INestApplication;
+    let prismaMock: PrismaService;
 
     const busMock = {
         execute: jest.fn().mockResolvedValue({ success: true }),
@@ -26,18 +29,17 @@ describe('HTTP (no DB)', () => {
     } as any;
 
     beforeAll(async () => {
+        prismaMock = createPrismaMock();
+
         const moduleRef = await Test.createTestingModule({
             imports: [AppModule],
         })
             .overrideProvider(PrismaService).useValue(prismaMock)
+            // Bu blokta CommandBus'ı mockluyoruz (Survey answer testinde kullanılacak)
             .overrideProvider(CommandBus).useValue(busMock)
-
-            // Global guard varsa tamamen serbest bırak
-            .overrideProvider(APP_GUARD).useValue({ canActivate: () => true })
-
-            // Controller seviyesindeki guard’ları gerçekten BYPASS et
-            .overrideGuard(AnyKeyGuard).useValue({ canActivate: () => true })
-            .overrideGuard(ReportKeyGuard).useValue({ canActivate: () => true })
+            // Controller seviyesindeki guard’ları BYPASS et
+            .overrideGuard(AnyKeyGuard).useValue(new AllowGuard())
+            .overrideGuard(ReportKeyGuard).useValue(new AllowGuard())
             .compile();
 
         app = moduleRef.createNestApplication();
@@ -53,14 +55,19 @@ describe('HTTP (no DB)', () => {
         const res = await request(app.getHttpServer())
             .post('/api/surveys/42/answer')
             .send({ score: 5, comment: 'ok' })
-            .expect((res) => { expect([200, 201]).toContain(res.status); });
+            .expect((r) => { expect([200, 201]).toContain(r.status); });
 
         expect(res.body).toEqual({ success: true });
         expect(busMock.execute).toHaveBeenCalledTimes(1);
-    }); describe
+    });
 
-    it('POST /api/requests -> prisma.request.create mock ile döner', async () => {
-        (prismaMock as any).request.create.mockResolvedValue({
+    // test/http.nodb.spec.ts  (yalnızca ilgili test değişti)
+    it('POST /api/requests -> CommandBus.execute sonucu döner', async () => {
+        // Bu test izole olsun diye execute'u resetle
+        busMock.execute.mockReset();
+
+        // Controller'ın döndürmesini beklediğimiz sahte sonuç
+        const created = {
             id: 1,
             citizen_name: 'Ali',
             phone: '555',
@@ -68,15 +75,68 @@ describe('HTTP (no DB)', () => {
             category: 'Su',
             description: 'Arıza',
             status: 'ACIK',
-        });
+        };
+        busMock.execute.mockResolvedValueOnce(created);
 
         const res = await request(app.getHttpServer())
             .post('/api/requests')
             .set('X-Api-Key', 'op-key-123')
             .send({ citizen_name: 'Ali', phone: '555', address: 'X', category: 'Su', description: 'Arıza' })
-            .expect((res) => { expect([200, 201]).toContain(res.status); });
+            .expect((r) => { expect([200, 201]).toContain(r.status); });
 
-        expect(res.body.id).toBe(1);
-        expect((prismaMock as any).request.create).toHaveBeenCalledTimes(1);
+        // Dönen gövde busMock.execute'in sonucuyla aynı olmalı
+        expect(res.body).toEqual(created);
+        expect(busMock.execute).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('HTTP (no DB) — real /export/daily flow', () => {
+    let app: INestApplication;
+    let prismaMock: PrismaService;
+
+    beforeAll(async () => {
+        prismaMock = createPrismaMock();
+        // ExportDaily gerçek handler çalışsın diye CommandBus’ı burada mocklamıyoruz
+
+        const moduleRef = await Test.createTestingModule({
+            imports: [AppModule],
+        })
+            .overrideProvider(PrismaService).useValue(prismaMock)
+            .overrideGuard(AnyKeyGuard).useValue(new AllowGuard())
+            .overrideGuard(ReportKeyGuard).useValue(new AllowGuard())
+            .compile();
+
+        app = moduleRef.createNestApplication();
+        app.setGlobalPrefix('api');
+        await app.init();
+    });
+
+    afterAll(async () => {
+        await app.close();
+    });
+
+    it('POST /api/export/daily -> CsvWriterService.writeDaily çağrılır', async () => {
+        // Bugünün aralığında veri çekildiğinde boş liste dönsün (I/O yapmayalım)
+        (prismaMock as any).survey.findMany.mockResolvedValue([]);
+
+        // CsvWriterService’i yakalayıp writeDaily’i stub’la
+        const csv = app.get(CsvWriterService) as CsvWriterService;
+        const writeSpy = jest.spyOn(csv, 'writeDaily').mockResolvedValue('/tmp/out.csv');
+
+        const res = await request(app.getHttpServer())
+            .post('/api/export/daily')
+            .set('X-Api-Key', 'op-key-123')
+            .expect((r) => { expect([200, 201]).toContain(r.status); });
+
+        expect(writeSpy).toHaveBeenCalledTimes(1);
+        // Argümanların şekli: filename (string), rows (array)
+        const [filename, rows] = writeSpy.mock.calls[0];
+        expect(typeof filename).toBe('string');
+        expect(Array.isArray(rows)).toBe(true);
+
+        // Handler tipik olarak { path, count } döndürür; burada en azından body’nin obje olduğunu doğrulayalım
+        expect(typeof res.body).toBe('object');
+
+        writeSpy.mockRestore();
     });
 });
