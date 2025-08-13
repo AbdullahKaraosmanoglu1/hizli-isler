@@ -18,7 +18,6 @@ export class ExportDailyHandler implements ICommandHandler<ExportDailyCommand> {
             orderBy: { answered_at: 'asc' },
         });
 
-        // PASSTHROUGH — normalize yok
         const day = format(start, 'yyyy-MM-dd');
         const stamp = format(new Date(), 'HHmmss');
         const filename = `${day}_${stamp}_survey_report.csv`;

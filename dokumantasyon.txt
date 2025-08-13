@@ -1,0 +1,126 @@
+Hızlı İşler — Çağrı Merkezi Servisi (NestJS + CQRS)
+
+Vatandaş taleplerini kaydeden, durum geçişlerini yöneten ve çözülen talepler için anket daveti/yanıtlarını toplayan bir mikro servis geliştirdim. Gün sonunda anket yanıtlarını CSV olarak ./out/sftp/ klasörüne yazıyorum. Projeyi NestJS + CQRS, Prisma, PostgreSQL, Docker Compose ve Jest kullanarak geliştirdim.
+
+1) ÖZET
+- Talepleri oluşturuyor, atıyor ve Açık - Atandı - Çözüldü akışında yönetiyorum.
+- Talep Çözüldü olduğunda in-process event bus üzerinden RequestResolved olayını yayımlıyorum.
+- Bu olayı dinleyen Anket modülüm davet kaydı açıyor; sonrasında kullanıcının yanıtını (score 1–5, comment) kaydediyorum.
+- Gün sonunda oluşan yanıtları CSV dosyasına aktarıyorum.
+
+2) ÖZELLİKLER
+- Talepler: CRUD, atama, durum geçişlerini implemente ettim.
+- Olaylaşma: In-process event (Nest @nestjs/cqrs) mimarisini kullandım.
+- Anketler: Davet oluşturma ve yanıt toplama akışlarını yazdım.
+- Metrikler: Ortalama çözüm süresi (saat), son 24 saatte çözülen sayısı, ortalama puanı hesaplıyorum.
+- Raporlama: Gün sonu CSV üretimini manuel endpoint ve cron job ile sağlıyorum.
+
+3) TEKNOLOJİLER
+- Backend: NestJS (TypeScript), CQRS
+- ORM: Prisma
+- Veritabanı: PostgreSQL (Docker Compose ile)
+- Test: Jest
+- Diğer: date-fns, class-validator
+
+4) MİMARİ
+- domain/ : İş kurallarını, entity/VO/event tanımlarını burada tuttum.
+- application/ : Komut ve sorgu handler’larını (CQRS) ve iş akışlarını burada kurguladım.
+- infrastructure/ : Prisma servisleri, dosya sistemi işlemleri ve guard’lar burada.
+- api/ : Controller’ları burada topladım.
+
+5) EVENT BUS
+- In-process (Nest @nestjs/cqrs) kullanıyorum.
+
+6) VERİ MODELİ (özet)
+requests(id, citizen_name, phone, address, category, description, status, created_at, assigned_to, resolved_at)
+surveys(id, request_id, invited_at, score, comment, answered_at)
+Not: Gerçek şema ve indeksleri Prisma migration dosyalarında tuttum.
+
+7) KURULUM
+7.1 Gereksinimler
+- Docker ve Docker Compose
+- Node.js 18+
+
+7.2 Adımlar
+1. Depoyu klonladıktan sonra kökte bir .env dosyası oluşturdum (aşağıdaki şablona bakabilirsiniz).
+2. Veritabanını başlatmak için:
+   docker compose up -d
+3. Prisma hazırlığı için:
+   npx prisma generate
+   npx prisma migrate deploy
+
+8) ORTAM DEĞİŞKENLERİ (örnek .env)
+PORT=5000
+OPERATOR_API_KEY=op-key-123
+REPORT_API_KEY=rep-key-456
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/hizliisler?schema=public
+EXPORT_OUT_DIR=out/sftp
+EXPORT_DELIMITER=;
+TZ=Europe/Istanbul
+
+Açıklamalar:
+- DATABASE_URL: Prisma bağlantı dizesi.
+- EXPORT_OUT_DIR: CSV’nin yazılacağı göreli klasör.
+- EXPORT_DELIMITER: CSV ayırıcı (“;” önerilir).
+- TZ: Cron ve tarih formatlaması için saat dilimi.
+
+9) UYGULAMAYI ÇALIŞTIRMA
+Geliştirme:
+  npm run start:dev
+
+Prod:
+  npm run build
+  npm run start:prod
+
+Uygulama adresi: http://localhost:5000
+Not: Host makinede raporları görebilmek için API servisine ./out:/app/out bind mount vermenizi öneririm.
+
+10) API
+10.1 Talepler
+- POST /api/requests  → Talep oluşturma
+- PATCH /api/requests/{id}/assign  → Atama
+- PATCH /api/requests/{id}/resolve → Çözüldü yap (RequestResolved olayı tetiklenir)
+
+10.2 Anketler
+- POST /api/surveys/{requestId}/answer → Yanıt gönder (body: { score: 1..5, comment?: string })
+
+10.3 Metrikler
+- GET /api/metrics/summary → { avg_resolution_hours, resolved_24h, avg_score }
+
+10.4 Raporlama
+- POST /api/export/daily → Gün sonu CSV üretimi
+Not: PowerShell kullanıyorsanız “curl” alias’ı yerine “curl.exe” veya “Invoke-WebRequest” kullanmanızı öneririm.
+
+11) GÜVENLİK
+- Header’da X-Api-Key bekliyorum.
+  - operator anahtarı: Talep uçları
+  - report anahtarı: Metrik ve raporlama uçları
+- Guard’lar: AnyKeyGuard, ReportKeyGuard
+
+12) METRİKLER
+- avg_resolution_hours: Çözülen talepler için ortalama çözüm süresi (saat).
+- resolved_24h: Son 24 saatte çözülen talep adedi.
+- avg_score: Anket yanıtlarının puan ortalaması.
+
+13) CSV RAPORLAMA
+- Manuel: POST /api/export/daily
+- Zamanlanmış: Cron ile her gün 23:59
+- Çıktı klasörü: ./out/sftp/
+- Dosya adı: YYYY-MM-DD_HHmmss_survey_report.csv
+- Başlık satırı: request_id;score;comment;answered_at
+- Kaçışlama: Çift tırnakları CSV standardına göre iki kez yazarım (“""”).
+
+Not: Dosya adını sadece tarih olacak şekilde değiştirmek isterseniz export handler’daki format satırını güncellemeniz yeterlidir.
+
+14) TESTLER
+Jest ile birim ve basit entegrasyon testleri:
+  npm run test
+Daha ayrıntılı çıktı için:
+  npm run test -- --verbose
+
+  15) AI Kullanımı
+
+- CSV kaçışlama ve ayırıcı stratejisi için kod iskeleti
+- Cron zamanlayıcı ve günlük rapor akışı
+- Docker compose hatalarının sebebi
+- Kurduğum mimari iskeletinin best practice uygunluğu

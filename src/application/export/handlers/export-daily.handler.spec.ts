@@ -1,4 +1,3 @@
-// src/application/export/handlers/export-daily.handler.spec.ts
 import { ExportDailyHandler } from './export-daily.handler';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CsvWriterService } from '../../../infrastructure/files/csv-writer.service';
@@ -23,7 +22,6 @@ describe('ExportDailyHandler', () => {
         const [filename, data] = writeDaily.mock.calls[0];
         expect(typeof filename).toBe('string');
         expect(Array.isArray(data)).toBe(true);
-        // normalize yok — birebir aynı
         expect(data[0]).toEqual(rows[0]);
         expect(result).toMatchObject({ path: '/tmp/foo.csv', count: rows.length });
     });

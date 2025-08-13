@@ -1,4 +1,3 @@
-// src/infrastructure/files/csv-writer.service.spec.ts
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -38,14 +37,13 @@ describe('CsvWriterService', () => {
         const [header, data] = normalized.split('\n');
 
         expect(header).toBe('request_id;score;comment;answered_at');
-        // comment tırnaklı, tarih tırnaksız
         expect(data).toMatch(/^99;4;"he said ""ok""; then left";\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
     });
 
     it('null ve undefined alanları boş bırakır', async () => {
         const tmp = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'csv-test-'));
         process.env.EXPORT_OUT_DIR = path.join(tmp, 'out', 'sftp');
-        process.env.EXPORT_DELIMITER = ';';   // ⬅️ ÖNEMLİ: her testte açıkça ayarla
+        process.env.EXPORT_DELIMITER = ';';
 
         const svc = new CsvWriterService();
 
@@ -54,7 +52,7 @@ describe('CsvWriterService', () => {
 
         const raw = await fs.promises.readFile(file, 'utf8');
         const normalized = raw.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').trim();
-        const line = normalized.split('\n')[1]; // data satırı
+        const line = normalized.split('\n')[1];
 
         expect(line).toBe('1;;"";');
     });

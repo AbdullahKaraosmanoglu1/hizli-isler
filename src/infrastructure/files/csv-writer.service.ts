@@ -15,7 +15,6 @@ export class CsvWriterService {
 
     private resolveDelimiter(): string {
         const raw = (process.env.EXPORT_DELIMITER ?? process.env.EXPORT_DELIMETER ?? '').trim();
-        // Boş/whitespace geldiyse güvenli varsayılan
         return raw.length ? raw : ';';
     }
     private readonly delimiter = this.resolveDelimiter();
@@ -48,11 +47,9 @@ export class CsvWriterService {
                     : r.answered_at
                         ? fmtDate(new Date(r.answered_at))
                         : '';
-            // Sadece comment tırnaklı; tarih tırnaksız
             return [id, score, comment, answered].join(this.delimiter);
         });
 
-        // CRLF + UTF-8 BOM
         const content = [header, ...lines].join('\r\n');
         await fs.promises.writeFile(filePath, '\uFEFF' + content, 'utf8');
         return filePath;

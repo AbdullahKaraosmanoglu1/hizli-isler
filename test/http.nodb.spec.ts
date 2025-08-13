@@ -1,4 +1,3 @@
-// test/http.nodb.spec.ts
 import { Test } from '@nestjs/testing';
 import { INestApplication, CanActivate, ExecutionContext } from '@nestjs/common';
 import request from 'supertest';
@@ -35,9 +34,7 @@ describe('HTTP (no DB) — bus mocked', () => {
             imports: [AppModule],
         })
             .overrideProvider(PrismaService).useValue(prismaMock)
-            // Bu blokta CommandBus'ı mockluyoruz (Survey answer testinde kullanılacak)
             .overrideProvider(CommandBus).useValue(busMock)
-            // Controller seviyesindeki guard’ları BYPASS et
             .overrideGuard(AnyKeyGuard).useValue(new AllowGuard())
             .overrideGuard(ReportKeyGuard).useValue(new AllowGuard())
             .compile();
@@ -61,12 +58,9 @@ describe('HTTP (no DB) — bus mocked', () => {
         expect(busMock.execute).toHaveBeenCalledTimes(1);
     });
 
-    // test/http.nodb.spec.ts  (yalnızca ilgili test değişti)
     it('POST /api/requests -> CommandBus.execute sonucu döner', async () => {
-        // Bu test izole olsun diye execute'u resetle
         busMock.execute.mockReset();
 
-        // Controller'ın döndürmesini beklediğimiz sahte sonuç
         const created = {
             id: 1,
             citizen_name: 'Ali',
@@ -84,7 +78,6 @@ describe('HTTP (no DB) — bus mocked', () => {
             .send({ citizen_name: 'Ali', phone: '555', address: 'X', category: 'Su', description: 'Arıza' })
             .expect((r) => { expect([200, 201]).toContain(r.status); });
 
-        // Dönen gövde busMock.execute'in sonucuyla aynı olmalı
         expect(res.body).toEqual(created);
         expect(busMock.execute).toHaveBeenCalledTimes(1);
     });
@@ -96,7 +89,6 @@ describe('HTTP (no DB) — real /export/daily flow', () => {
 
     beforeAll(async () => {
         prismaMock = createPrismaMock();
-        // ExportDaily gerçek handler çalışsın diye CommandBus’ı burada mocklamıyoruz
 
         const moduleRef = await Test.createTestingModule({
             imports: [AppModule],
@@ -116,10 +108,8 @@ describe('HTTP (no DB) — real /export/daily flow', () => {
     });
 
     it('POST /api/export/daily -> CsvWriterService.writeDaily çağrılır', async () => {
-        // Bugünün aralığında veri çekildiğinde boş liste dönsün (I/O yapmayalım)
         (prismaMock as any).survey.findMany.mockResolvedValue([]);
 
-        // CsvWriterService’i yakalayıp writeDaily’i stub’la
         const csv = app.get(CsvWriterService) as CsvWriterService;
         const writeSpy = jest.spyOn(csv, 'writeDaily').mockResolvedValue('/tmp/out.csv');
 
@@ -129,12 +119,10 @@ describe('HTTP (no DB) — real /export/daily flow', () => {
             .expect((r) => { expect([200, 201]).toContain(r.status); });
 
         expect(writeSpy).toHaveBeenCalledTimes(1);
-        // Argümanların şekli: filename (string), rows (array)
         const [filename, rows] = writeSpy.mock.calls[0];
         expect(typeof filename).toBe('string');
         expect(Array.isArray(rows)).toBe(true);
 
-        // Handler tipik olarak { path, count } döndürür; burada en azından body’nin obje olduğunu doğrulayalım
         expect(typeof res.body).toBe('object');
 
         writeSpy.mockRestore();
