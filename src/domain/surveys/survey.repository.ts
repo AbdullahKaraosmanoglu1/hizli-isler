@@ -5,6 +5,4 @@ export interface SurveyRepository {
     findByRequestId(requestId: number): Promise<Survey | null>;
     answer(requestId: number, score: number, comment: string): Promise<Survey>;
 }
-
-// DI token
 export const SURVEY_REPOSITORY = Symbol('SURVEY_REPOSITORY');

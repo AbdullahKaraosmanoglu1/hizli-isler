@@ -1,4 +1,3 @@
-// src/api/export/export.controller.ts
 import { Controller, Post, UseGuards } from '@nestjs/common';
 import { ReportKeyGuard } from '../../infrastructure/auth/api-key.guards';
 import { CommandBus } from '@nestjs/cqrs';

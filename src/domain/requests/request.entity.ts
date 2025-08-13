@@ -1,4 +1,3 @@
-// Basit domain entity tipi
 export type RequestStatus = 'Açık' | 'Atandı' | 'Çözüldü';
 
 export interface Request {
