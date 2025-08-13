@@ -13,7 +13,7 @@ type Row = {
 @Injectable()
 export class CsvWriterService {
     private readonly outDir = path.join(process.cwd(), 'out', 'sftp');
-    private readonly delimiter = ';'; // Excel-TR için ; önerilir
+    private readonly delimiter = ';';
 
     async writeDaily(filename: string, rows: Row[]): Promise<string> {
         await fs.promises.mkdir(this.outDir, { recursive: true });
@@ -40,15 +40,14 @@ export class CsvWriterService {
 
         const lines = rows.map(r =>
             [
-                r.request_id,                               // sayı -> tırnaksız
-                r.score,                                    // sayı -> tırnaksız
+                r.request_id,
+                r.score,
                 escape(r.score !== null ? String(r.score) : ''),
                 escape(r.answered_at ? fmtDate(new Date(r.answered_at)) : ''),
 
             ].join(this.delimiter)
         );
 
-        // UTF-8 BOM + CRLF satır sonu
         const content = [header, ...lines].join('\r\n');
         await fs.promises.writeFile(filePath, '\uFEFF' + content, 'utf8');
 

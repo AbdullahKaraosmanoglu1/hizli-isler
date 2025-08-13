@@ -1,24 +1,48 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16
-    container_name: my_postgres
+    container_name: hizliisler-db
     restart: unless-stopped
-    ports:
-      - "5432:5432" # <<< DEĞİŞTİ: host 5433, container 5432
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: Postgres123!
       POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
-      # <<< EK: sağlıklı kalktı mı?
       test: [ "CMD-SHELL", "pg_isready -U postgres -d postgres" ]
       interval: 5s
       timeout: 3s
       retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hizliisler-api
+    restart: unless-stopped
+    env_file:
+      - .env.docker # DATABASE_URL burada ...@db:5432/... olmalı
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - ./out/sftp:/app/out/sftp
+    command: [ "/bin/sh", "./docker/entrypoint.sh" ]
+
+  adminer:
+    image: adminer
+    container_name: hizliisler-adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
-  postgres_data:
+  pgdata:

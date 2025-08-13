@@ -1,13 +1,14 @@
+// src/api/export/export.controller.ts
 import { Controller, Post } from '@nestjs/common';
-import { DailyExportJob } from '../../infrastructure/sched/daily-export.job';
+import { CommandBus } from '@nestjs/cqrs';
+import { ExportDailyCommand } from '../../application/export/commands/export-daily.command';
 
 @Controller('export')
 export class ExportController {
-    constructor(private readonly job: DailyExportJob) { }
+    constructor(private readonly bus: CommandBus) { }
 
     @Post('daily')
-    async runDaily() {
-        const res = await this.job.runOnce();
-        return { ok: true, ...res };
+    run() {
+        return this.bus.execute(new ExportDailyCommand());
     }
 }
