@@ -13,16 +13,22 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test": "jest -c jest.config.ts",
+    "test:watch": "jest -c jest.config.ts --watch",
+    "test:cov": "jest -c jest.config.ts --coverage",
+    "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest -c jest.config.ts --runInBand",
+    "test:http": "cross-env NODE_ENV=test jest -c ./test/jest-e2e.json --runInBand",
+    "test:e2e": "cross-env NODE_ENV=test DOTENV_CONFIG_PATH=.env.test jest -c ./test/jest-e2e.json --runInBand",
+    "pretest:e2e": "npm run db:test:deploy",
+    "db:test:deploy": "cross-env NODE_ENV=test DOTENV_CONFIG_PATH=.env.test prisma migrate deploy",
+    "db:test:reset": "cross-env NODE_ENV=test DOTENV_CONFIG_PATH=.env.test prisma migrate reset --force",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "prisma:studio": "prisma studio",
     "migrate": "prisma migrate dev",
-    "migrate:docker": "dotenv -e .env.docker -- prisma migrate dev"
+    "migrate:docker": "dotenv -e .env.docker -- prisma migrate dev",
+    "test:e2e:docker": "dotenv -e .env.docker -- cross-env NODE_ENV=test jest -c ./test/jest-e2e.json --runInBand",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -49,38 +55,23 @@
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.10.7",
-    "@types/supertest": "^6.0.2",
+    "@types/supertest": "^6.0.3",
+    "cross-env": "^10.0.0",
+    "dotenv": "^17.2.1",
     "dotenv-cli": "^10.0.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
     "eslint-plugin-prettier": "^5.2.2",
     "globals": "^16.0.0",
-    "jest": "^30.0.0",
+    "jest": "^30.0.5",
     "prettier": "^3.4.2",
     "source-map-support": "^0.5.21",
-    "supertest": "^7.0.0",
-    "ts-jest": "^29.2.5",
+    "supertest": "^7.1.4",
+    "ts-jest": "^29.4.1",
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
   }
 }
