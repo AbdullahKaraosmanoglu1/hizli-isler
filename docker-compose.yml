@@ -1,45 +1,48 @@
 services:
-  postgres:
+  db:
     image: postgres:16
     container_name: hizliisler-db
-    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: hizliisler
     ports:
       - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres -d hizliisler" ]
       interval: 5s
-      timeout: 5s
+      timeout: 3s
       retries: 20
-
-  api:
-    build: .
-    container_name: hizliisler-api
-    restart: unless-stopped
-    env_file: .env.docker
-    ports:
-      - "5000:5000"
-    depends_on:
-      postgres:
-        condition: service_healthy
     volumes:
-      - ./out/sftp:/app/out/sftp
-    command: [ "/bin/sh", "./docker/entrypoint.sh" ]
+      - pgdata:/var/lib/postgresql/data
 
   adminer:
     image: adminer
     container_name: hizliisler-adminer
-    restart: unless-stopped
+    depends_on:
+      - db
     ports:
       - "8080:8080"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hizliisler-api
+    env_file:
+      - .env.docker
+    ports:
+      - "5000:5000"
     depends_on:
-      postgres:
+      db:
         condition: service_healthy
+    volumes:
+      - ./out/sftp:/app/out/sftp
+    command: >
+      sh -lc "
+        npx prisma migrate deploy || npx prisma db push;
+        node dist/src/main.js
+      "
 
 volumes:
   pgdata:
