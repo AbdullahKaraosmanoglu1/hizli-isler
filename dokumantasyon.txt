@@ -117,8 +117,23 @@ Jest ile birim ve basit entegrasyon testleri:
   npm run test
 Daha ayrıntılı çıktı için:
   npm run test -- --verbose
+   
+   14.1)
+Unit testler
 
-  15) AI Kullanımı
+src/infrastructure/files/csv-writer.service.spec.ts — CSV biçimlemeyi izole ettim; servisi direkt çağırıp kenar durumları (null tarih, çift tırnak) için beklenen çıktıyı doğruladım.
+
+src/app.controller.spec.ts — Controller’ı Nest TestingModule ile ayağa kaldırdım, bağımlılıkları jest ile mock’ladım ve sadece controller mantığını test ettim.
+
+src/application/export/handlers/export-daily.handler.spec.ts — Export handler’ını izole ettim; Prisma ve CsvWriter’ı jest.fn() ile sahteledim, handler’ın doğru kompozisyonu çağırdığını ve doğru veriyi ürettiğini doğruladım.
+
+Entegrasyon / E2E testler
+
+src/api/surveys/surveys.controller.spec.ts — Uygulamayı gerçekçi bir TestingModule ile ayağa kaldırdım, guard/pipe zincirini devreye alıp supertest ile HTTP istekleri attım; uçtan uca davranışı kontrol ettim.
+
+test/http.nodb.spec.ts — DB’yi devre dışı bırakıp HTTP katmanını uçtan uca denedim; endpoint sözleşmelerini ve akışları supertest ile doğruladım.
+
+ 15) AI Kullanımı
 
 - CSV kaçışlama ve ayırıcı stratejisi için kod iskeleti
 - Cron zamanlayıcı ve günlük rapor akışı
